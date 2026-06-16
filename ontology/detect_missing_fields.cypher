@@ -43,7 +43,15 @@ WITH placeholders, rule, n, report_id, raw_entries,
       ELSE [entry.value]
     END
   ) AS values,
-  [entry IN raw_entries WHERE entry.value IS NOT NULL | entry.field + "=" + toString(entry.value)] AS original_values
+  [entry IN raw_entries WHERE entry.value IS NOT NULL |
+    entry.field + "=" + CASE
+      WHEN valueType(entry.value) STARTS WITH "LIST" THEN
+        "[" + reduce(text = "", item IN entry.value |
+          text + CASE WHEN text = "" THEN "" ELSE ", " END + toString(item)
+        ) + "]"
+      ELSE toString(entry.value)
+    END
+  ] AS original_values
 WITH placeholders, rule, n, report_id, original_values, values,
   [value IN values WHERE NOT trim(toString(value)) IN placeholders] AS valid_values
 WHERE size(values) = 0 OR size(valid_values) = 0
@@ -88,6 +96,7 @@ SET finding.report_id = report.id,
     finding.source_section = coalesce(n.source_section, "自动检测"),
     finding.confidence = 1.0
 MERGE (evidence:Entity:Evidence {id: evidence_id})
+ON CREATE SET evidence.collected_at = datetime()
 SET evidence.report_id = report.id,
     evidence.name = rule.label + "." + rule.field + " 字段质量证据",
     evidence.compliance_item_id = item.id,
@@ -95,8 +104,7 @@ SET evidence.report_id = report.id,
     evidence.evidence_type = "规则检测",
     evidence.description = "字段缺失或占位值检测证据",
     evidence.content = "target_node_id=" + n.id + "; field=" + rule.field + "; original_value=" + coalesce(raw_value, "<NULL>"),
-    evidence.source = "detect_missing_fields.cypher",
-    evidence.collected_at = datetime()
+    evidence.source = "detect_missing_fields.cypher"
 MERGE (report)-[:HAS_COMPLIANCE_ITEM]->(item)
 MERGE (report)-[:HAS_FINDING]->(finding)
 MERGE (report)-[:HAS_EVIDENCE]->(evidence)

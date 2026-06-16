@@ -48,6 +48,12 @@ chmod +x scripts/detect_missing_fields.sh
 scripts/detect_missing_fields.sh
 ```
 
+Windows 环境建议在 Git Bash 中执行上述脚本；如果在 PowerShell 中运行，可使用：
+
+```powershell
+& "C:\Program Files\Git\bin\bash.exe" scripts/detect_missing_fields.sh
+```
+
 也可以直接执行 Cypher：
 
 ```bash
